@@ -664,7 +664,194 @@
     <header style="padding: 12px 15px;">
         <h2 style="font-family: 'Bebas Neue'; color: var(--ouro); letter-spacing: 3px; font-size: 28px; line-height: 1;">⚖ ZELADOR CÍVICO</h2>
         <p style="font-family: 'Syne'; color: var(--ouro-alaranjado); font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; opacity: 0.85;">Transformando visão em poder</p>
+        <button onclick="abrirDetalheAba()" style="margin-top:8px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,215,0,0.4); color:var(--ouro); font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; padding:5px 14px; border-radius:20px; cursor:pointer; transition:all .2s; width:100%;">
+            ℹ detalhes desta operação
+        </button>
     </header>
+
+<!-- OVERLAY DE DETALHES DA ABA ATUAL -->
+<div id="overlay-detalhes" style="display:none; position:fixed; inset:0; z-index:9998; background:var(--bg); flex-direction:column;">
+    <div style="background:var(--azul); border-bottom:3px solid var(--ouro); padding:12px 16px; display:flex; align-items:center; justify-content:space-between;">
+        <span style="font-family:'Bebas Neue',sans-serif; font-size:16px; letter-spacing:3px; color:var(--ouro);">ℹ DETALHES DA OPERAÇÃO</span>
+        <button onclick="fecharDetalheAba()" style="background:none; border:1px solid rgba(255,215,0,0.4); color:var(--ouro); font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:5px 14px; border-radius:20px; cursor:pointer;">
+            ← CONTINUAR
+        </button>
+    </div>
+    <div id="overlay-detalhes-corpo" style="flex:1; overflow-y:auto; padding:20px 18px 40px; -webkit-overflow-scrolling:touch;">
+        <!-- conteúdo injetado via JS -->
+    </div>
+    <div style="padding:14px 18px; background:white; border-top:1px solid var(--cinza2);">
+        <button onclick="fecharDetalheAba()" style="width:100%; background:var(--azul); color:white; border:none; font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:700; letter-spacing:2px; text-transform:uppercase; padding:13px; border-radius:10px; cursor:pointer;">
+            ← CONTINUAR NA OPERAÇÃO
+        </button>
+    </div>
+</div>
+
+<script>
+// Mapeamento aba → índice do slide do onboarding + conteúdo inline
+const DETALHES_ABA = {
+    radar: {
+        icone: '🗺️',
+        titulo: 'Radar — O mapa do seu perímetro',
+        corpo: `
+            <p style="font-family:'Barlow',sans-serif;font-size:14px;color:var(--accent);line-height:1.7;margin-bottom:18px;">
+                Assim que você entra com seu CEP, o mapa mostra três tipos de marcadores no seu entorno. Toque em qualquer ponto para ver o detalhe.
+            </p>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">O que cada marcador significa</div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid #d32f2f;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">● Ponto vermelho pulsante</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;"><strong style="color:#d32f2f;">Anomalia detectada</strong> — irregularidade em contrato, obra atrasada ou discrepância orçamentária na sua região.</div>
+            </div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid var(--azul);border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">📍 Pino dourado</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;"><strong>Seu endereço</strong> — o ponto exato correspondente ao CEP que você informou.</div>
+            </div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid #6a1b9a;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">✕ Cruz preta pulsante</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;"><strong style="color:#6a1b9a;">Emenda parlamentar</strong> — recurso destinado por um vereador a uma entidade ou obra naquele ponto.</div>
+            </div>`
+    },
+    alertas: {
+        icone: '⚠️',
+        titulo: 'Alertas — Irregularidades no seu bairro',
+        corpo: `
+            <p style="font-family:'Barlow',sans-serif;font-size:14px;color:var(--accent);line-height:1.7;margin-bottom:18px;">
+                Cada anomalia detectada no mapa vira um card de alerta. Toque em <strong>"Síntese Técnica + Ações"</strong> para ver a análise completa e agir.
+            </p>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Exemplos de alertas</div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid #d32f2f;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">Irregularidade em Licitação</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;">Contrato de <strong>R$ 284M</strong> com SLA violado <strong>1.240 vezes</strong> sem aplicação de multa contratual.</div>
+            </div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid #d32f2f;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">Atraso Crítico em Obra</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;">Obra com <strong>77% de atraso</strong> sem justificativa nos sistemas da Prefeitura.</div>
+            </div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin:14px 0 10px;">O que você pode fazer</div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid var(--azul);border-radius:0 8px 8px 0;padding:12px 14px;">
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;">O app gera textos prontos para acionar seu <strong>vereador</strong>, enviar ao <strong>grupo de WhatsApp</strong> do bairro, protocolar no <strong>TCM-SP</strong> ou <strong>Ministério Público</strong> — com base legal incluída.</div>
+            </div>`
+    },
+    emendas: {
+        icone: '🏛️',
+        titulo: 'Emendas — Para onde vai o dinheiro dos vereadores',
+        corpo: `
+            <p style="font-family:'Barlow',sans-serif;font-size:14px;color:var(--accent);line-height:1.7;margin-bottom:18px;">
+                Vereadores destinam verbas a entidades, associações e obras por emendas parlamentares. Esta tela mostra quem enviou, quanto, para onde e se o destinatário tem CNPJ ativo.
+            </p>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Exemplo de emenda no perímetro</div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid #6a1b9a;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">EMP-2023-001 · 2023</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.6;">Ver. <strong>Laércio Marvão Neto</strong> · Gab. 14<br>→ Assoc. Comunit. Vila Beiral · <strong>R$ 250.000</strong><br>Objeto: Reforma da sede social.<br>CNPJ: 12.345.678/0001-90 ✓</div>
+            </div>
+            <div style="background:#fff8f8;border:1px solid #fca5a5;border-left:4px solid #6a1b9a;border-radius:0 8px 8px 0;padding:12px 14px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">EMP-2023-002 · 2023</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.6;">Ver. <strong>Veruska Talmir</strong> · Gab. 31<br>→ EMEF Dist. Setor Leste IV · <strong>R$ 180.000</strong><br><strong style="color:#f57c00;">⚠ Sem CNPJ registrado</strong></div>
+            </div>`
+    },
+    vereadores: {
+        icone: '🔍',
+        titulo: 'Vereadores — Radar de padrões suspeitos',
+        corpo: `
+            <p style="font-family:'Barlow',sans-serif;font-size:14px;color:var(--accent);line-height:1.7;margin-bottom:18px;">
+                Três formas de investigar: ranking de irregularidades, convergência de emendas para o mesmo receptor, e consulta direta por nome de vereador.
+            </p>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Padrões monitorados</div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid #d32f2f;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">🔁 Destinação repetida · Risco Alto · 85%</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;">Mesma entidade beneficiada por <strong>3 anos consecutivos</strong> sem processo seletivo público.</div>
+            </div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid #d32f2f;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">🎯 Convergência</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;">Uma mesma entidade recebeu emendas de <strong>3 vereadores de partidos distintos</strong> — possível captura política.</div>
+            </div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid var(--azul);border-radius:0 8px 8px 0;padding:12px 14px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">🔍 Consulta direta</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;">Digite o nome e veja histórico completo de emendas com flags: ✓ Regular, 🔁 Repetida, ⚠ Atenção.</div>
+            </div>`
+    },
+    investimento: {
+        icone: '💰',
+        titulo: 'Invest. Local — O que foi contratado e o que foi feito',
+        corpo: `
+            <p style="font-family:'Barlow',sans-serif;font-size:14px;color:var(--accent);line-height:1.7;margin-bottom:18px;">
+                Contratos municipais ativos na sua região com comparativo entre o licitado e o executado. Anomalias contratuais são destacadas.
+            </p>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Exemplo real</div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid var(--ouro-alaranjado);border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">Manutenção Semafórica · CET-SP · R$ 284M</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.6;">SLA contratual: 4h<br>SLA violado: <strong>1.240 vezes</strong><br>Anomalia: cabo antifurto não exigido — custo evitável: <strong>R$ 18M/ano</strong>.</div>
+            </div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid #d32f2f;border-radius:0 8px 8px 0;padding:12px 14px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">Telemetria Semafórica · R$ 31M</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;">Previsto no PPA 2022–2025. <strong>Nunca licitado.</strong> Verba redirecionada sem justificativa.</div>
+            </div>`
+    },
+    licitacoes: {
+        icone: '📄',
+        titulo: 'Licitações — Contratos e Diário Oficial',
+        corpo: `
+            <p style="font-family:'Barlow',sans-serif;font-size:14px;color:var(--accent);line-height:1.7;margin-bottom:18px;">
+                Lista de licitações municipais com filtros por status e zona. Inclui acesso ao Diário Oficial com interpretação automática em linguagem cidadã.
+            </p>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">O que você encontra</div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid var(--azul);border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">📄 Licitações filtradas pela sua zona</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;">Contratos vigentes, em auditoria ou encerrados. Clique na anomalia para ver o detalhe do contrato.</div>
+            </div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid var(--azul);border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">📰 Diário Oficial — busca com IA</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;">Busque termos como "dispensa" ou "aditivo". Toque em <strong>"Interpretar para o Cidadão"</strong> e receba veredito 🟢🟡🔴 com fundamentação e sugestão de ação.</div>
+            </div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid var(--ouro-alaranjado);border-radius:0 8px 8px 0;padding:12px 14px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">💰 Investimento Coletivo — âmbito cidade</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;">Contratos de abrangência municipal, não restrito ao seu CEP.</div>
+            </div>`
+    },
+    ranking: {
+        icone: '🏆',
+        titulo: 'Ranking — Arrecadação vs. Retorno por Zona',
+        corpo: `
+            <p style="font-family:'Barlow',sans-serif;font-size:14px;color:var(--accent);line-height:1.7;margin-bottom:18px;">
+                Gráfico histórico de 12 anos (2013–2024) mostrando quanto cada zona arrecadou em tributos e quanto recebeu de volta em serviços. Navegue por janelas de 4 anos.
+            </p>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">O que os dados revelam</div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid #2e7d32;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">Zona Central · retorno em queda</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;">Arrecadou <strong>R$ 33,2 bilhões</strong> em 2024. Retorno: <strong>33%</strong> — o menor índice histórico.</div>
+            </div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid #2e7d32;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px;">
+                <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">Zona Leste · injustiça fiscal acumulada</div>
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;">Nunca ultrapassou <strong>32% de retorno</strong> em 12 anos. Arrecada menos e recebe proporcionalmente ainda menos.</div>
+            </div>
+            <div style="background:white;border:1px solid var(--cinza2);border-left:4px solid var(--azul);border-radius:0 8px 8px 0;padding:12px 14px;">
+                <div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--accent);line-height:1.5;">Selecione uma zona nos filtros para destacar sua curva e ver a análise específica. As caixinhas em cada ponto do gráfico mostram o % de retorno daquele ano.</div>
+            </div>`
+    }
+};
+
+function abrirDetalheAba() {
+    var abaAtual = document.querySelector('.tab-content.active');
+    var id = abaAtual ? abaAtual.id.replace('tab-', '') : 'radar';
+    var detalhe = DETALHES_ABA[id] || DETALHES_ABA['radar'];
+
+    var corpo = document.getElementById('overlay-detalhes-corpo');
+    corpo.innerHTML =
+        '<div style="font-family:\'DM Mono\',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Você está em</div>' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">' +
+            '<span style="font-size:32px;">' + detalhe.icone + '</span>' +
+            '<div style="font-family:\'Syne\',sans-serif;font-weight:700;font-size:18px;color:var(--azul);line-height:1.2;">' + detalhe.titulo + '</div>' +
+        '</div>' +
+        detalhe.corpo;
+
+    var overlay = document.getElementById('overlay-detalhes');
+    overlay.style.display = 'flex';
+}
+
+function fecharDetalheAba() {
+    document.getElementById('overlay-detalhes').style.display = 'none';
+}
+</script>
     
     <div class="tabs">
         <button class="tab-btn active" id="tab-btn-radar" onclick="mudarAba('radar', this)">RADAR</button>
